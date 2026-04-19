@@ -43,9 +43,10 @@ When Mongo routes or startup checks are enabled, ensure `MONGODB_URI` is valid a
 
 ### 4. Run the API
 
-From the project root, with the virtual environment activated:
+From the project root, activate the virtual environment and start the server:
 
 ```bash
+source env/Scripts/activate
 uvicorn main:app --reload
 ```
 
