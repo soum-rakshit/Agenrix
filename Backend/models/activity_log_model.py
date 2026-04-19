@@ -9,14 +9,13 @@ class ActivityLogModel:
         This prevents massive document overhead for high-frequency writes.
         """
         now = datetime.now()
-        # Round down to the current hour to create a unique bucket ID
         bucket_time = now.replace(minute=0, second=0, microsecond=0)
 
         return await activity_logs_collection.update_one(
             {
                 "agent_id": agent_id,
                 "bucket_start_time": bucket_time,
-                "event_count": {"$lt": 1000}  # Limits bucket size for performance
+                "event_count": {"$lt": 1000}
             },
             {
                 "$push": {"logs": log_entry},

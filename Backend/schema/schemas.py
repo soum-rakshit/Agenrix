@@ -2,8 +2,6 @@ from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
-# --- Shared Utility Schemas ---
-# Used primarily for the NoSQL Activity Log
 class ResourceAffected(BaseModel):
     resource_name: str
     location_path: str
@@ -24,7 +22,7 @@ class AccessRights(BaseModel):
     servers: List[str] = []
 
 class AgentCreate(BaseModel):
-    agent_id: str = Field(..., max_length=50) # Matching SQL String(50)
+    agent_id: str = Field(..., max_length=50)
     agent_name: str = Field(..., max_length=100)
     agent_source: str = Field(..., max_length=255)
     agent_description: Optional[str] = Field(None, max_length=500)
@@ -34,10 +32,8 @@ class AgentCreate(BaseModel):
     contributors: List[str] = []
     access_rights: AccessRights
 
-    # This allows Pydantic to work with SQLAlchemy models (ORM mode)
     model_config = ConfigDict(from_attributes=True)
 
-# --- 2. External Communication Schema (NoSQL) ---
 class ExternalCommCreate(BaseModel):
     agent_id: str
     recipient: EmailStr
@@ -45,7 +41,6 @@ class ExternalCommCreate(BaseModel):
     shared_data: List[SharedData]
     timestamp: datetime = Field(default_factory=datetime.now)
 
-# --- 3. Activity Log Schema (NoSQL - High Volume) ---
 class LogEntry(BaseModel):
     session_id: str
     used_by: str

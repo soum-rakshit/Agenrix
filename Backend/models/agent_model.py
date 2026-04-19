@@ -9,12 +9,11 @@ class AgentModel:
         """
         Inserts a new agent into the database with default metadata.
         """
-        # 1. Handle Timestamps (Mongoose-style defaults)
         now = datetime.now()
         
         new_agent_doc = {
             "agent_id": agent_id,
-            "agent_name": f"Agent_{agent_id}",  # Default name
+            "agent_name": f"Agent_{agent_id}",
             "status": "active",
             "integration_details": {
                 "integrated_since": now,
@@ -33,7 +32,6 @@ class AgentModel:
             }
         }
 
-        # Async Insert into MongoDB
         result = await agents_collection.insert_one(new_agent_doc)
         print(new_agent_doc)
         return str(result.inserted_id)

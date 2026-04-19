@@ -5,12 +5,12 @@ from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
 from datetime import datetime
-# Database Imports
+
 from config.db_nosql import check_db_connection
-from config.db_sql import get_sql_db, engine, Base  # Your SQLAlchemy helper
+from config.db_sql import get_sql_db, engine, Base  
 from config.settings import settings
 
-# Schema and Model Imports
+
 from schema.schemas import AgentCreate
 from models.agent_model_sql import AgentModel
 
@@ -19,17 +19,17 @@ from sqlalchemy import select
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- 1. SQL Startup: Create Tables ---
+  
     print("Initializing PostgreSQL tables...")
     try:
         async with engine.begin() as conn:
-            # This checks the DB and creates 'agents' if it doesn't exist
+            
             await conn.run_sync(Base.metadata.create_all)
         print("✅ PostgreSQL tables synchronized.")
     except Exception as e:
         print(f"❌ Failed to sync PostgreSQL tables: {e}")
 
-    # # --- 2. NoSQL Startup: Check MongoDB ---
+   
     # is_connected = await check_db_connection()
     # if is_connected:
     #     print("✅ Successfully connected to MongoDB Atlas (Async)")
@@ -38,15 +38,12 @@ async def lifespan(app: FastAPI):
 
     yield
     
-    # --- Shutdown Logic ---
-    # print("Shutting down connections...")
-    # Optional: Close the engine to clean up connection pools
-    # await engine.dispose()
+
 
 # app = FastAPI(lifespan=lifespan)
 app = FastAPI()
 
-# Import your routes here later
+
 
 
 @app.get("/")
@@ -92,7 +89,7 @@ async def add_agent(
 
 
 
-#get route to get all the agents
+
 @app.get("/agents", response_model=List[AgentCreate])
 async def get_agents(
     # --- Standard String/ID Filters ---
@@ -174,7 +171,7 @@ async def get_agents(
 
 
 
-#update route
+
 @app.patch("/update_agent/{agent_id}")
 async def update_agent(
     agent_id: str, 
@@ -196,18 +193,18 @@ async def update_agent(
             if hasattr(agent, key):
                 current_val = getattr(agent, key)
                 
-                # Check if we are updating a nested JSON object (like access_rights)
+                
                 if isinstance(current_val, dict) and isinstance(value, dict):
-                    # Deep merge the new data into the old data
+                    
                     current_val.update(value)
                     setattr(agent, key, current_val)
-                    # Force SQLAlchemy to see the change inside the dict
+                    
                     flag_modified(agent, key)
                 else:
-                    # Standard replacement for strings/integers
+                    
                     setattr(agent, key, value)
         
-        # Update internal timestamps
+        
         ts = dict(agent.timestamps) if agent.timestamps else {}
         ts["last_updated"] = datetime.now().isoformat()
         agent.timestamps = ts
@@ -219,7 +216,7 @@ async def update_agent(
     
     except IntegrityError as e:
         await db.rollback()
-        # Log the error for your eyes, return a clean message to the user
+        
         print(f"Integrity Conflict: {e}")
         raise HTTPException(
             status_code=409, 
@@ -236,7 +233,7 @@ async def delete_agent(
     agent_id: str, 
     db: AsyncSession = Depends(get_sql_db)
 ):
-    # 1. Check if agent exists
+   
     query = select(AgentModel).where(AgentModel.agent_id == agent_id)
     result = await db.execute(query)
     agent = result.scalar_one_or_none()
@@ -245,7 +242,7 @@ async def delete_agent(
         raise HTTPException(status_code=404, detail="Agent not found")
 
     try:
-        # 2. Delete the agent
+       
         await db.delete(agent)
         await db.commit()
         
