@@ -62,6 +62,8 @@ OpenAPI JSON: [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi
 | `GET` | `/` | Health-style message confirming the API is live. |
 | `POST` | `/add_agent` | Creates a new agent in PostgreSQL. Body: `AgentCreate` JSON. Returns `400` if `agent_id` already exists. |
 | `GET` | `/agents` | Lists agents with optional filters and pagination. Response model: list of `AgentCreate`. |
+| `PATCH` | `/update_agent/{agent_id}` | Updates an existing agent. Body: JSON with fields to update. Returns `404` if agent not found, `409` on constraint conflict. |
+| `DELETE` | `/delete_agent/{agent_id}` | Deletes an agent permanently. Returns `404` if agent not found. |
 
 ### `GET /agents` — query parameters
 

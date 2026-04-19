@@ -1,7 +1,10 @@
 from fastapi import FastAPI, HTTPException, Depends, Query
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.attributes import flag_modified
+from datetime import datetime
 # Database Imports
 from config.db_nosql import check_db_connection
 from config.db_sql import get_sql_db, engine, Base  # Your SQLAlchemy helper
@@ -168,3 +171,89 @@ async def get_agents(
         return []
 
     return agents
+
+
+
+#update route
+@app.patch("/update_agent/{agent_id}")
+async def update_agent(
+    agent_id: str, 
+    update_data: dict, 
+    db: AsyncSession = Depends(get_sql_db)
+):
+    query = select(AgentModel).where(AgentModel.agent_id == agent_id)
+    result = await db.execute(query)
+    agent = result.scalar_one_or_none()
+
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    update_data.pop("agent_id", None)
+    update_data.pop("agent_name", None)
+
+    try:
+        for key, value in update_data.items():
+            if hasattr(agent, key):
+                current_val = getattr(agent, key)
+                
+                # Check if we are updating a nested JSON object (like access_rights)
+                if isinstance(current_val, dict) and isinstance(value, dict):
+                    # Deep merge the new data into the old data
+                    current_val.update(value)
+                    setattr(agent, key, current_val)
+                    # Force SQLAlchemy to see the change inside the dict
+                    flag_modified(agent, key)
+                else:
+                    # Standard replacement for strings/integers
+                    setattr(agent, key, value)
+        
+        # Update internal timestamps
+        ts = dict(agent.timestamps) if agent.timestamps else {}
+        ts["last_updated"] = datetime.now().isoformat()
+        agent.timestamps = ts
+        flag_modified(agent, "timestamps")
+
+        await db.commit()
+        await db.refresh(agent)
+        return {"status": "success", "agent": agent}
+    
+    except IntegrityError as e:
+        await db.rollback()
+        # Log the error for your eyes, return a clean message to the user
+        print(f"Integrity Conflict: {e}")
+        raise HTTPException(
+            status_code=409, 
+            detail="Update conflict: This change violates database unique constraints (likely a duplicate agent_id)."
+        )
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/delete_agent/{agent_id}")
+async def delete_agent(
+    agent_id: str, 
+    db: AsyncSession = Depends(get_sql_db)
+):
+    # 1. Check if agent exists
+    query = select(AgentModel).where(AgentModel.agent_id == agent_id)
+    result = await db.execute(query)
+    agent = result.scalar_one_or_none()
+
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    try:
+        # 2. Delete the agent
+        await db.delete(agent)
+        await db.commit()
+        
+        return {
+            "status": "success", 
+            "message": f"Agent {agent_id} has been permanently deleted."
+        }
+    except Exception as e:
+        await db.rollback()
+        print(f"Delete Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")

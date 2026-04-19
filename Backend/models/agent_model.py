@@ -45,19 +45,6 @@ class AgentModel:
         """
         return await agents_collection.find_one({"agent_id": agent_id})
 
-    @staticmethod
-    async def update_agent(agent_id: str, update_data: Dict[str, Any]) -> int:
-        """
-        Updates agent details and flattens timestamps for $set.
-        """
-        # Ensure we update the last_updated field nested inside timestamps
-        update_data["timestamps.last_updated"] = datetime.now()
-        
-        result = await agents_collection.update_one(
-            {"agent_id": agent_id},
-            {"$set": update_data}
-        )
-        return result.modified_count
 
     @staticmethod
     async def delete_agent(agent_id: str) -> int:
