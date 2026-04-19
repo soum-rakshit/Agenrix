@@ -76,6 +76,55 @@ Optional filters (combine as needed):
 
 ---
 
+## PATCH /update_agent/{agent_id} — Update an Agent
+
+Updates an existing agent with new values. Supports partial updates (only provide fields you want to change).
+
+**Path Parameters:**
+- `agent_id` (string, required) — The unique identifier of the agent to update
+
+**Request Body:**
+JSON object with fields to update. Fields `agent_id` and `agent_name` are protected and will be ignored if provided.
+
+**Supported update scenarios:**
+- Shallow updates: `{"owner": "new_owner", "subscription_plan": "premium"}`
+- Deep merge for nested JSON: `{"access_rights": {"tools": ["tool1", "tool2"]}}` — merges with existing `access_rights`
+- Timestamps are automatically updated with `last_updated` ISO timestamp
+
+**Response codes:**
+- `200` — Success. Returns updated agent object.
+- `404` — Agent not found.
+- `409` — Conflict: update violates unique constraints (e.g., duplicate `agent_id` from another agent).
+- `500` — Internal server error.
+
+**Example:**
+```bash
+curl -X PATCH http://127.0.0.1:8000/update_agent/agent_001 \
+  -H "Content-Type: application/json" \
+  -d '{"subscription_plan": "enterprise", "status": "active"}'
+```
+
+---
+
+## DELETE /delete_agent/{agent_id} — Delete an Agent
+
+Permanently deletes an agent from the database.
+
+**Path Parameters:**
+- `agent_id` (string, required) — The unique identifier of the agent to delete
+
+**Response codes:**
+- `200` — Success. Agent deleted.
+- `404` — Agent not found.
+- `500` — Internal server error.
+
+**Example:**
+```bash
+curl -X DELETE http://127.0.0.1:8000/delete_agent/agent_001
+```
+
+---
+
 ## Project layout (high level)
 
 - `main.py` — FastAPI app and routes
