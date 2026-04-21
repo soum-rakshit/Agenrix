@@ -19,11 +19,9 @@ from sqlalchemy import select
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-  
     print("Initializing PostgreSQL tables...")
     try:
         async with engine.begin() as conn:
-            
             await conn.run_sync(Base.metadata.create_all)
         print("✅ PostgreSQL tables synchronized.")
     except Exception as e:
@@ -37,10 +35,8 @@ async def lifespan(app: FastAPI):
     #     print("❌ Failed to connect to MongoDB")
 
     yield
-    
 
 
-# app = FastAPI(lifespan=lifespan)
 app = FastAPI()
 
 
@@ -48,7 +44,7 @@ app = FastAPI()
 
 @app.get("/")
 async def root():
-    return {"message": "Agent Management System API is Live"}\
+    return {"message": "Agent Management System API is Live"}
 
 @app.post("/add_agent")
 async def add_agent(
@@ -58,7 +54,6 @@ async def add_agent(
     try:
         existing_agent = await AgentModel.get_agent_by_id(db, agent.agent_id)
         if existing_agent:
-            # We raise a 400 Bad Request or 409 Conflict
             raise HTTPException(
                 status_code=400, 
                 detail=f"Agent with ID '{agent.agent_id}' already exists."
@@ -66,24 +61,20 @@ async def add_agent(
         agent_data = agent.model_dump()
         print("agent_data reached")
 
-        # 3. Save to SQL Database
-        # Ensure AgentModel.create_agent is updated for SQLAlchemy logic
         new_agent = await AgentModel.create_agent(db, agent_data)
 
         return {
             "status": "success",
             "message": f"Agent {agent.agent_name} created successfully in SQL",
             "data": {
-                "id": new_agent.id, # Assuming your SQL model has an autoincrement ID
+                "id": new_agent.id,
                 "agent_id": new_agent.agent_id
             }
         }
 
     except HTTPException as he:
-        # Re-raise FastAPIs HTTP exceptions so they return correctly
         raise he
     except Exception as e:
-        # Log the actual error for debugging
         print(f"Internal Error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
@@ -92,26 +83,19 @@ async def add_agent(
 
 @app.get("/agents", response_model=List[AgentCreate])
 async def get_agents(
-    # --- Standard String/ID Filters ---
     agent_id: Optional[str] = None,
     agent_name: Optional[str] = None,
     agent_source: Optional[str] = None,
     owner: Optional[str] = None,
     authorized_by: Optional[str] = None,
     subscription_plan: Optional[str] = None,
-    status: Optional[str] = None, # Pulled from integration_details or column
-
-    # --- JSONB List Filters (Contributors) ---
+    status: Optional[str] = None,
     contributor: Optional[str] = None,
-
-    # --- Nested JSONB Filters (Access Rights) ---
     tool: Optional[str] = None,
     file: Optional[str] = None,
     data_node: Optional[str] = None,
     api: Optional[str] = None,
     server: Optional[str] = None,
-
-    # --- Pagination ---
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0),
     db: AsyncSession = Depends(get_sql_db)
@@ -131,16 +115,11 @@ async def get_agents(
     if subscription_plan:
         query = query.where(AgentModel.subscription_plan == subscription_plan)
     if status:
-        # Filtering status inside the integration_details JSON
         query = query.where(AgentModel.integration_details['status'].astext == status)
 
-    # 2. Contributors Filter (Top-level JSON List)
     if contributor:
-        # Check if the list contains the string
         query = query.where(AgentModel.contributors.contains([contributor]))
 
-    # 3. Access Rights Filters (Nested JSON List)
-    # These fulfill your requirement to "list all agents that have access to a certain file/tool"
     if file:
         query = query.where(AgentModel.access_rights['files'].contains([file]))
     
@@ -156,11 +135,8 @@ async def get_agents(
     if server:
         query = query.where(AgentModel.access_rights['servers'].contains([server]))
 
-
-    # 3. Add pagination (important for performance)
     query = query.offset(offset).limit(limit)
 
-    # 4. Execute the query
     result = await db.execute(query)
     agents = result.scalars().all()
 
@@ -193,17 +169,12 @@ async def update_agent(
             if hasattr(agent, key):
                 current_val = getattr(agent, key)
                 
-                
                 if isinstance(current_val, dict) and isinstance(value, dict):
-                    
                     current_val.update(value)
                     setattr(agent, key, current_val)
-                    
                     flag_modified(agent, key)
                 else:
-                    
                     setattr(agent, key, value)
-        
         
         ts = dict(agent.timestamps) if agent.timestamps else {}
         ts["last_updated"] = datetime.now().isoformat()
@@ -216,7 +187,6 @@ async def update_agent(
     
     except IntegrityError as e:
         await db.rollback()
-        
         print(f"Integrity Conflict: {e}")
         raise HTTPException(
             status_code=409, 
@@ -241,7 +211,6 @@ async def delete_agent(
         raise HTTPException(status_code=404, detail="Agent not found")
 
     try:
-       
         await db.delete(agent)
         await db.commit()
         
