@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from config.db_sql import Base
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import select
 
 class AgentModel(Base):
     __tablename__ = "agents"
@@ -95,3 +96,9 @@ class AgentModel(Base):
             await db.commit()
             return 1
         return 0
+    
+    @staticmethod
+    async def check_exists(db, agent_id: str):
+        query = select(AgentModel).where(AgentModel.agent_id == agent_id)
+        result = await db.execute(query)
+        return result.scalars().first() is not None

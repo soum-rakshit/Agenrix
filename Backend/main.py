@@ -11,8 +11,9 @@ from config.db_sql import get_sql_db, engine, Base
 from config.settings import settings
 
 
-from schema.schemas import AgentCreate
+from schema.schemas import AgentCreate, ActivityInput, ExternalCommInput
 from models.agent_model_sql import AgentModel
+from models.agent_activity_model import NoSQLModel
 
 from typing import List, Optional
 from sqlalchemy import select
@@ -221,4 +222,89 @@ async def delete_agent(
     except Exception as e:
         await db.rollback()
         print(f"Delete Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+
+@app.post("/add_agent_activity")
+async def add_agent_activity(
+    activity_data: ActivityInput, 
+    db: AsyncSession = Depends(get_sql_db)
+):
+    """
+    Endpoint for high-frequency internal agent actions.
+    Uses the Bucket Pattern to store events efficiently.
+    """
+
+    
+    # Inside the route
+    exists = await AgentModel.check_exists(db, activity_data.agent_id)
+    if not exists:
+        raise HTTPException(status_code=404, detail="Agent identity not found in SQL")
+    try:
+        # Convert Pydantic model to dict
+        event_dict = activity_data.event.model_dump()
+        
+        # Log to MongoDB
+        result = await NoSQLModel.log_activity_bucket(
+            activity_data.agent_id, 
+            event_dict
+        )
+        
+        return {
+            "status": "success",
+            "message": "Activity captured in hourly bucket",
+            "agent_id": activity_data.agent_id
+        }
+    except Exception as e:
+        print(f"Logging Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to log activity")
+
+@app.post("/add_external_comm")
+async def add_external_comm(comm_data: ExternalCommInput, db: AsyncSession = Depends(get_sql_db)):
+    """
+    Endpoint for sensitive data sharing audits.
+    Includes automatic compliance flag calculation.
+    """
+    # Inside the route
+    exists = await AgentModel.check_exists(db,  comm_data.agent_id)
+    if not exists:
+        raise HTTPException(status_code=404, detail="Agent identity not found in SQL")
+    
+    try:
+        comm_dict = comm_data.model_dump()
+        result = await NoSQLModel.add_external_comm(comm_dict)
+        
+        return {
+            "status": "success",
+            "id": str(result.inserted_id),
+            "compliance_check": "Complete"
+        }
+    except Exception as e:
+        print(f"Comm Audit Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to log communication")
+    
+
+    
+
+@app.get("/get_agent_activity/{agent_id}")
+async def get_agent_activity(agent_id: str):
+    try:
+        # Fetch both data streams concurrently
+        activities = await NoSQLModel.get_all_activities(agent_id)
+        communications = await NoSQLModel.get_all_communications(agent_id)
+
+        if not activities and not communications:
+            raise HTTPException(status_code=404, detail="No activity found for this Agent ID")
+
+        return {
+            "agent_id": agent_id,
+            "total_activities": len(activities),
+            "total_external_comms": len(communications),
+            "data": {
+                "activity_logs": activities,
+                "external_communications": communications
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching activity: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")

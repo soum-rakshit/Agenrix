@@ -2,18 +2,24 @@ from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
-class ResourceAffected(BaseModel):
-    resource_name: str
-    location_path: str
-    operation: str  # READ, WRITE, DELETE
-    is_confidential: bool = False
+# --- Shared Utility Schemas ---
 
 class SharedData(BaseModel):
-    item_name: str
+    item: str
+    classification: str
+    is_confidential: bool
     location_path: str
-    is_confidential: bool = True
+    encryption_status: Optional[str] = "None"
 
-# --- 1. Agent Schema (Modified for SQL) ---
+class EventEntry(BaseModel):
+    session_id: str
+    used_by: str
+    action: str
+    duration_min: int
+    files_altered: List[str] = []
+
+# --- 1. Agent Schema (SQL Optimized) ---
+
 class AccessRights(BaseModel):
     tools: List[str] = []
     files: List[str] = []
@@ -34,19 +40,13 @@ class AgentCreate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class ExternalCommCreate(BaseModel):
+# --- 2. Combined NoSQL Input Schemas ---
+
+class ExternalCommInput(BaseModel):
     agent_id: str
     recipient: EmailStr
-    approver_id: str
-    shared_data: List[SharedData]
-    timestamp: datetime = Field(default_factory=datetime.now)
+    data_shared: List[SharedData]
 
-class LogEntry(BaseModel):
-    session_id: str
-    used_by: str
-    session_authorizer_id: str
-    action_type: str
-    task_details: str
-    duration_minutes: int
-    resources_affected: List[ResourceAffected]
-    timestamp: datetime = Field(default_factory=datetime.now)
+class ActivityInput(BaseModel):
+    agent_id: str
+    event: EventEntry
