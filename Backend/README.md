@@ -1,22 +1,22 @@
-# Agent Management System API
+# Agenrix - Agent Tracker
 
-FastAPI backend for managing agents with PostgreSQL (async SQLAlchemy) and optional MongoDB support.
+FastAPI backend for managing agents with PostgreSQL (async SQLAlchemy) and MongoDB support.
 
 ## Requirements
 
 - **Python 3.10 or higher** — required for async patterns and modern type-hinting used in this project.
 - A reachable **PostgreSQL** instance (cloud or local).
-- Optional: **MongoDB** (Motor/PyMongo) for NoSQL features when that layer is enabled.
+- A reachable **MongoDB** (Motor/PyMongo) instance (cloud or local).
 
 ## Setup
 
 ### 0. Prerequisites
 
-Before starting, ensure you have:
+Before starting, ensure you have a .env file with the following:
 
-- **PostgreSQL** instance running (local or cloud-hosted)
-- **MongoDB** instance (optional, for NoSQL features)
-- Valid connection credentials for both databases
+- **PostgreSQL** instance running 
+- **MongoDB** instance running
+- Valid connection credentials for both databases and port
 
 ### 1. Create and activate a virtual environment
 
@@ -41,7 +41,7 @@ Create a `.env` file in the project root (same directory as `main.py`). The app 
 | Variable       | Purpose                                                                                                                                                         | Example                                                 |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | `PORT`         | Port number on which the FastAPI server will run.                                                                                                               | `8000`                                                  |
-| `POSTGRES_URI` | Async SQLAlchemy connection string for PostgreSQL. For async SQLAlchemy with `asyncpg`, use a URI like `postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DATABASE`. | `postgresql+asyncpg://user:pass@localhost:5432/agenrix` |
+| `POSTGRES_URI` | Async SQLAlchemy connection string for PostgreSQL. You must use the `postgresql+asyncpg://` prefix for async compatibility. | `postgresql+asyncpg://user:pass@localhost:5432/agenrix` |
 | `MONGODB_URI`  | MongoDB connection string (Atlas or self-hosted). Optional if NoSQL features are not being used.                                                                | `mongodb+srv://user:pass@cluster.mongodb.net/agentdb`   |
 
 **Sample `.env` file:**
@@ -82,11 +82,11 @@ The server will:
 Initializing PostgreSQL tables...
 ✅ PostgreSQL tables synchronized.
 ✅ Successfully connected to MongoDB Atlas (Async)
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Uvicorn running on http://127.0.0.1:{PORT} (Press CTRL+C to quit)
 ```
 
-Then visit: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)  
-OpenAPI JSON: [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json)
+Then visit: [http://127.0.0.1:{PORT}/docs](http://127.0.0.1:{PORT}/docs)  
+OpenAPI JSON: [http://127.0.0.1:{PORT}/openapi.json](http://127.0.0.1:{PORT}/openapi.json)
 
 ---
 
@@ -96,7 +96,7 @@ OpenAPI JSON: [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi
 
 | Method   | Path                       | Description                                                                                                                  |
 | -------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/`                        | Automatically redirects to `/docs` (Swagger UI). Health confirmation that the API is live.                                   |
+| `GET`    | `/`                        | Auto-redirect to `/docs` feature. Provides health confirmation that the API is live.                                   |
 | `POST`   | `/add_agent`               | Creates a new agent in PostgreSQL. Body: `AgentCreate` JSON. Returns `400` if `agent_id` already exists.                     |
 | `GET`    | `/agents`                  | Lists agents with optional filters and pagination. Response model: list of `AgentCreate`.                                    |
 | `PATCH`  | `/update_agent/{agent_id}` | Updates an existing agent. Body: JSON with fields to update. Returns `404` if agent not found, `409` on constraint conflict. |
@@ -123,7 +123,7 @@ This API uses a **hybrid storage approach**:
 
 ### Activity Logging with Bucket Pattern
 
-Activity logs are stored in hourly buckets in MongoDB to efficiently handle high-frequency writes from multiple agents:
+Activity logs are stored in hourly buckets in MongoDB. This implements the Bucket Pattern for handling high-velocity (100k+ API calls) activity logs efficiently:
 
 ```json
 {
