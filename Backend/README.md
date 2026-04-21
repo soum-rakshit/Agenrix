@@ -472,5 +472,5 @@ Backend/
 │   └── nosql_models.py    # MongoDB logic (Bucket Pattern)
 ├── schema/
 │   └── schemas.py         # Pydantic validation models
-└── main.py                # API Routes & Lifespan management
+└── main.py                # API Routes
 ```
