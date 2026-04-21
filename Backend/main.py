@@ -233,7 +233,6 @@ async def delete_agent(
     agent_id: str, 
     db: AsyncSession = Depends(get_sql_db)
 ):
-   
     query = select(AgentModel).where(AgentModel.agent_id == agent_id)
     result = await db.execute(query)
     agent = result.scalar_one_or_none()
