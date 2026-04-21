@@ -42,7 +42,7 @@ Create a `.env` file in the project root (same directory as `main.py`). The app 
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | `PORT`         | Port number on which the FastAPI server will run.                                                                                                               | `8000`                                                  |
 | `POSTGRES_URI` | Async SQLAlchemy connection string for PostgreSQL. You must use the `postgresql+asyncpg://` prefix for async compatibility. | `postgresql+asyncpg://user:pass@localhost:5432/agenrix` |
-| `MONGODB_URI`  | MongoDB connection string (Atlas or self-hosted). Optional if NoSQL features are not being used.                                                                | `mongodb+srv://user:pass@cluster.mongodb.net/agentdb`   |
+| `MONGODB_URI`  | MongoDB connection string (Atlas or self-hosted).                                                                 | `mongodb+srv://user:pass@cluster.mongodb.net/agentdb`   |
 
 **Sample `.env` file:**
 
@@ -56,7 +56,7 @@ MONGODB_URI=mongodb+srv://myuser:mypassword@cluster.mongodb.net/agentrix_db?retr
 If you use a hosted database such as **Supabase** or **Neon**, connections are often blocked until your client IP is allowed. Add your machine’s public IP (or your deployment region’s egress IPs) to the provider’s **IP allowlist / network restrictions** so the API can open a pool to the database.
 
 **MongoDB connectivity**  
-When MongoDB is enabled in the app, ensure `MONGODB_URI` is valid and network access matches your Atlas or server firewall rules. If MongoDB is not used, the connection check will log a warning but the server will continue to run.
+Ensure `MONGODB_URI` is valid and network access matches your Atlas or server firewall rules to successfully connect to the MongoDB instance.
 
 **Port conflicts**  
 Ensure the PORT specified in `.env` is not already in use on your system. If it is, modify the PORT value in `.env` and restart the server.
@@ -72,7 +72,7 @@ python main.py
 The server will:
 
 - Initialize PostgreSQL tables automatically on startup
-- Check MongoDB connectivity (if enabled)
+- Verify MongoDB connectivity on startup
 - Start on `http://127.0.0.1:{PORT}` as specified in your `.env` file
 - Automatically redirect to Swagger UI at `http://127.0.0.1:{PORT}/docs`
 
@@ -96,7 +96,7 @@ OpenAPI JSON: [http://127.0.0.1:{PORT}/openapi.json](http://127.0.0.1:{PORT}/ope
 
 | Method   | Path                       | Description                                                                                                                  |
 | -------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/`                        | Auto-redirect to `/docs` feature. Provides health confirmation that the API is live.                                   |
+| `GET`    | `/`                        | Auto-redirect to `/docs`, Swagger UI.                                 |
 | `POST`   | `/add_agent`               | Creates a new agent in PostgreSQL. Body: `AgentCreate` JSON. Returns `400` if `agent_id` already exists.                     |
 | `GET`    | `/agents`                  | Lists agents with optional filters and pagination. Response model: list of `AgentCreate`.                                    |
 | `PATCH`  | `/update_agent/{agent_id}` | Updates an existing agent. Body: JSON with fields to update. Returns `404` if agent not found, `409` on constraint conflict. |
@@ -120,6 +120,29 @@ This API uses a **hybrid storage approach**:
 
 - **PostgreSQL (SQL):** Stores agent identity, metadata, subscription plans, and access rights. Optimized for structured queries and relational integrity.
 - **MongoDB (NoSQL):** Stores high-frequency activity logs, communication audits, and event streams using the Bucket Pattern for scalability.
+
+### Agent Identity and Metadata with PostgreSQL
+
+Agent identity, configuration, and access rights are stored in a relational PostgreSQL database to ensure data integrity and structured querying. The agent model includes a flexible JSONB column for granular access rights:
+
+```json
+{
+    "agent_id": "AGT-1000",
+    "agent_name": "Security Bot 1",
+    "agent_source": "Internal",
+    "owner": "Team Alpha",
+    "status": "Active",
+    "access_rights": {
+        "tools": ["nmap", "wireshark"],
+        "files": ["/etc/passwd"],
+        "data_nodes": ["DB-Main"],
+        "apis": ["AuthService"],
+        "servers": ["srv-01"]
+    }
+}
+```
+
+This model ensures strict uniqueness on `agent_id` while providing flexibility for dynamic access right definitions.
 
 ### Activity Logging with Bucket Pattern
 
@@ -151,16 +174,63 @@ All sensitive data sharing through the API is logged with compliance tracking:
 - Automatic compliance flag calculation based on data sensitivity
 - Enables audit trails for regulatory compliance (SOC2, GDPR, etc.)
 
+```json
+{
+    "agent_id": "agent_001",
+    "recipient": "analyst@company.com",
+    "timestamp": "2026-04-21T14:30:00Z",
+    "compliance_flag": true,
+    "data_shared": [
+        {
+            "item": "sales_report",
+            "classification": "internal",
+            "is_confidential": false,
+            "location_path": "/reports/sales",
+            "encryption_status": "None"
+        }
+    ]
+}
+```
+
 ---
 
-### `GET /agents` — query parameters
+## GET /agents — List Agents
 
-Optional filters (combine as needed):
+Fetches a list of agents based on optional query parameters.
 
-- **Identity / metadata:** `agent_id`, `agent_name`, `agent_source`, `owner`, `authorized_by`, `subscription_plan`, `status`
-- **Contributors (JSON list):** `contributor`
-- **Access rights (nested JSON):** `tool`, `file`, `data_node`, `api`, `server`
-- **Pagination:** `limit` (default `100`, max `500`), `offset` (default `0`)
+**Query Parameters:**
+- `agent_id`, `agent_name`, `agent_source`, `owner`, `authorized_by`, `subscription_plan`, `status`
+- `contributor` (JSON list item check)
+- `tool`, `file`, `data_node`, `api`, `server` (Access rights nested JSON check)
+- `limit` (default `100`, max `500`), `offset` (default `0`)
+
+**Response codes:**
+
+- `200` — Success. Returns list of agents.
+- `500` — Internal server error.
+
+**Example Request:**
+
+```bash
+curl -X GET "http://127.0.0.1:8000/agents?status=Active&limit=10"
+```
+
+**Example Response:**
+
+```json
+[
+  {
+    "agent_id": "AGT-1000",
+    "agent_name": "Security Bot 1",
+    "agent_source": "Internal",
+    "owner": "Team Alpha",
+    "status": "Active",
+    "access_rights": {
+        "tools": ["nmap"]
+    }
+  }
+]
+```
 
 ---
 
@@ -271,21 +341,37 @@ Fetches all activity logs and external communications for a specific agent acros
 ```json
 {
   "agent_id": "agent_001",
-  "total_activities": 25,
-  "total_external_comms": 3,
+  "total_activities": 1,
+  "total_external_comms": 1,
   "data": {
     "activity_logs": [
       {
         "agent_id": "agent_001",
         "hour": "2026-04-21T14:00:00Z",
-        "events": [...]
+        "events": [
+          {
+            "session_id": "sess_123",
+            "used_by": "operator_name",
+            "action": "data_access",
+            "duration_min": 5,
+            "files_altered": ["file1.txt"]
+          }
+        ]
       }
     ],
     "external_communications": [
       {
         "agent_id": "agent_001",
         "recipient": "recipient@example.com",
-        "data_shared": [...],
+        "data_shared": [
+          {
+            "item": "sales_report",
+            "classification": "internal",
+            "is_confidential": false,
+            "location_path": "/reports/sales",
+            "encryption_status": "None"
+          }
+        ],
         "timestamp": "2026-04-21T14:30:00Z"
       }
     ]
@@ -316,7 +402,17 @@ Updates an existing agent with new values. Supports partial updates (only provid
 - `agent_id` (string, required) — The unique identifier of the agent to update
 
 **Request Body:**
-JSON object with fields to update. Fields `agent_id` and `agent_name` are protected and will be ignored if provided.
+Fields `agent_id` and `agent_name` are protected and will be ignored if provided.
+
+```json
+{
+  "subscription_plan": "enterprise",
+  "status": "active",
+  "access_rights": {
+    "tools": ["nmap", "new_tool"]
+  }
+}
+```
 
 **Supported update scenarios:**
 
@@ -365,7 +461,16 @@ curl -X DELETE http://127.0.0.1:8000/delete_agent/agent_001
 
 ## Project layout (high level)
 
-- `main.py` — FastAPI app and routes
-- `config/` — settings and database helpers (`settings.py`, `db_sql.py`, `db_nosql.py`)
-- `models/` — SQLAlchemy and domain models
-- `schema/` — Pydantic schemas
+```text
+Backend/
+├── config/
+│   ├── db_nosql.py    # MongoDB Motor client initialization
+│   ├── db_sql.py      # SQLAlchemy engine and AsyncSessionLocal
+│   └── settings.py    # Pydantic/OS Environment management
+├── models/
+│   ├── agent_model_sql.py # PostgreSQL Table (JSONB columns)
+│   └── nosql_models.py    # MongoDB logic (Bucket Pattern)
+├── schema/
+│   └── schemas.py         # Pydantic validation models
+└── main.py                # API Routes & Lifespan management
+```
