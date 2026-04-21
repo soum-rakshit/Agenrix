@@ -2,8 +2,6 @@ from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
-# --- Shared Utility Schemas ---
-
 class SharedData(BaseModel):
     item: str
     classification: str
@@ -17,8 +15,6 @@ class EventEntry(BaseModel):
     action: str
     duration_min: int
     files_altered: List[str] = []
-
-# --- 1. Agent Schema (SQL Optimized) ---
 
 class AccessRights(BaseModel):
     tools: List[str] = []
@@ -39,8 +35,6 @@ class AgentCreate(BaseModel):
     access_rights: AccessRights
 
     model_config = ConfigDict(from_attributes=True)
-
-# --- 2. Combined NoSQL Input Schemas ---
 
 class ExternalCommInput(BaseModel):
     agent_id: str

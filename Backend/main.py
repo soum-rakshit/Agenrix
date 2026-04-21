@@ -5,6 +5,7 @@ from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
 from datetime import datetime
+from fastapi.responses import RedirectResponse
 
 from config.db_nosql import check_db_connection
 from config.db_sql import get_sql_db, engine, Base  
@@ -17,6 +18,7 @@ from models.agent_activity_model import NoSQLModel
 
 from typing import List, Optional
 from sqlalchemy import select
+import uvicorn
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,12 +30,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Failed to sync PostgreSQL tables: {e}")
 
-   
-    # is_connected = await check_db_connection()
-    # if is_connected:
-    #     print("✅ Successfully connected to MongoDB Atlas (Async)")
-    # else:
-    #     print("❌ Failed to connect to MongoDB")
+    is_connected = await check_db_connection()
+    if is_connected:
+        print("✅ Successfully connected to MongoDB Atlas (Async)")
+    else:
+        print("❌ Failed to connect to MongoDB")
 
     yield
 
@@ -43,9 +44,9 @@ app = FastAPI()
 
 
 
-@app.get("/")
-async def root():
-    return {"message": "Agent Management System API is Live"}
+@app.get("/", include_in_schema=False)
+async def redirect_to_docs():
+    return RedirectResponse(url="/docs")
 
 @app.post("/add_agent")
 async def add_agent(
@@ -230,21 +231,11 @@ async def add_agent_activity(
     activity_data: ActivityInput, 
     db: AsyncSession = Depends(get_sql_db)
 ):
-    """
-    Endpoint for high-frequency internal agent actions.
-    Uses the Bucket Pattern to store events efficiently.
-    """
-
-    
-    # Inside the route
     exists = await AgentModel.check_exists(db, activity_data.agent_id)
     if not exists:
         raise HTTPException(status_code=404, detail="Agent identity not found in SQL")
     try:
-        # Convert Pydantic model to dict
         event_dict = activity_data.event.model_dump()
-        
-        # Log to MongoDB
         result = await NoSQLModel.log_activity_bucket(
             activity_data.agent_id, 
             event_dict
@@ -261,11 +252,6 @@ async def add_agent_activity(
 
 @app.post("/add_external_comm")
 async def add_external_comm(comm_data: ExternalCommInput, db: AsyncSession = Depends(get_sql_db)):
-    """
-    Endpoint for sensitive data sharing audits.
-    Includes automatic compliance flag calculation.
-    """
-    # Inside the route
     exists = await AgentModel.check_exists(db,  comm_data.agent_id)
     if not exists:
         raise HTTPException(status_code=404, detail="Agent identity not found in SQL")
@@ -289,7 +275,6 @@ async def add_external_comm(comm_data: ExternalCommInput, db: AsyncSession = Dep
 @app.get("/get_agent_activity/{agent_id}")
 async def get_agent_activity(agent_id: str):
     try:
-        # Fetch both data streams concurrently
         activities = await NoSQLModel.get_all_activities(agent_id)
         communications = await NoSQLModel.get_all_communications(agent_id)
 
@@ -305,6 +290,16 @@ async def get_agent_activity(agent_id: str):
                 "external_communications": communications
             }
         }
+    
+    except HTTPException as he:
+        raise he
+        
     except Exception as e:
         print(f"Error fetching activity: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=settings.PORT, reload=True)
+

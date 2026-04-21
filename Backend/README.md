@@ -10,6 +10,14 @@ FastAPI backend for managing agents with PostgreSQL (async SQLAlchemy) and optio
 
 ## Setup
 
+### 0. Prerequisites
+
+Before starting, ensure you have:
+
+- **PostgreSQL** instance running (local or cloud-hosted)
+- **MongoDB** instance (optional, for NoSQL features)
+- Valid connection credentials for both databases
+
 ### 1. Create and activate a virtual environment
 
 ```bash
@@ -30,27 +38,54 @@ pip install -r requirements.txt
 
 Create a `.env` file in the project root (same directory as `main.py`). The app loads variables via `python-dotenv` in `config/settings.py`.
 
-| Variable       | Purpose                                                                                                                                                         |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POSTGRES_URI` | Async SQLAlchemy connection string for PostgreSQL. For async SQLAlchemy with `asyncpg`, use a URI like `postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DATABASE`. |
-| `MONGODB_URI`  | MongoDB connection string (Atlas or self-hosted). In code this is read into the `MONGO_URI` setting attribute.                                                  |
+| Variable       | Purpose                                                                                                                                                         | Example                                                 |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `PORT`         | Port number on which the FastAPI server will run.                                                                                                               | `8000`                                                  |
+| `POSTGRES_URI` | Async SQLAlchemy connection string for PostgreSQL. For async SQLAlchemy with `asyncpg`, use a URI like `postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DATABASE`. | `postgresql+asyncpg://user:pass@localhost:5432/agenrix` |
+| `MONGODB_URI`  | MongoDB connection string (Atlas or self-hosted). Optional if NoSQL features are not being used.                                                                | `mongodb+srv://user:pass@cluster.mongodb.net/agentdb`   |
+
+**Sample `.env` file:**
+
+```env
+PORT=8000
+POSTGRES_URI=postgresql+asyncpg://myuser:mypassword@localhost:5432/agentrix_db
+MONGODB_URI=mongodb+srv://myuser:mypassword@cluster.mongodb.net/agentrix_db?retryWrites=true&w=majority
+```
 
 **PostgreSQL access (cloud providers)**  
 If you use a hosted database such as **Supabase** or **Neon**, connections are often blocked until your client IP is allowed. Add your machine’s public IP (or your deployment region’s egress IPs) to the provider’s **IP allowlist / network restrictions** so the API can open a pool to the database.
 
-**MongoDB**  
-When Mongo routes or startup checks are enabled, ensure `MONGODB_URI` is valid and network access matches your Atlas or server firewall rules.
+**MongoDB connectivity**  
+When MongoDB is enabled in the app, ensure `MONGODB_URI` is valid and network access matches your Atlas or server firewall rules. If MongoDB is not used, the connection check will log a warning but the server will continue to run.
+
+**Port conflicts**  
+Ensure the PORT specified in `.env` is not already in use on your system. If it is, modify the PORT value in `.env` and restart the server.
 
 ### 4. Run the API
 
 From the project root, activate the virtual environment and start the server:
 
 ```bash
-source env/Scripts/activate
-uvicorn main:app --reload
+python main.py
 ```
 
-Interactive docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)  
+The server will:
+
+- Initialize PostgreSQL tables automatically on startup
+- Check MongoDB connectivity (if enabled)
+- Start on `http://127.0.0.1:{PORT}` as specified in your `.env` file
+- Automatically redirect to Swagger UI at `http://127.0.0.1:{PORT}/docs`
+
+**Example output:**
+
+```
+Initializing PostgreSQL tables...
+✅ PostgreSQL tables synchronized.
+✅ Successfully connected to MongoDB Atlas (Async)
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```
+
+Then visit: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)  
 OpenAPI JSON: [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json)
 
 ---
@@ -61,7 +96,7 @@ OpenAPI JSON: [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi
 
 | Method   | Path                       | Description                                                                                                                  |
 | -------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/`                        | Health-style message confirming the API is live.                                                                             |
+| `GET`    | `/`                        | Automatically redirects to `/docs` (Swagger UI). Health confirmation that the API is live.                                   |
 | `POST`   | `/add_agent`               | Creates a new agent in PostgreSQL. Body: `AgentCreate` JSON. Returns `400` if `agent_id` already exists.                     |
 | `GET`    | `/agents`                  | Lists agents with optional filters and pagination. Response model: list of `AgentCreate`.                                    |
 | `PATCH`  | `/update_agent/{agent_id}` | Updates an existing agent. Body: JSON with fields to update. Returns `404` if agent not found, `409` on constraint conflict. |

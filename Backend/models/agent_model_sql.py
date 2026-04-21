@@ -19,18 +19,14 @@ class AgentModel(Base):
     authorized_by = Column(String(100))
     subscription_plan = Column(String(50))
     
-    # JSONB Fields for lists and nested objects
-    contributors = Column(JSONB) # List[str]
-    access_rights = Column(JSONB) # Dict
+    contributors = Column(JSONB)
+    access_rights = Column(JSONB)
     integration_details = Column(JSONB)
     timestamps = Column(JSONB)
 
 
     @staticmethod
     async def create_agent(db: AsyncSession, agent_data: Dict[str, Any]) -> str:
-        """
-        Inserts a new agent into PostgreSQL based on the provided schema data.
-        """
         now = datetime.now().isoformat()
         
         new_agent = AgentModel(
@@ -61,25 +57,19 @@ class AgentModel(Base):
             db.add(new_agent)
             await db.commit()
             await db.refresh(new_agent)
-            return new_agent # Returning the business ID for convenience
+            return new_agent
         except Exception as e:
             await db.rollback()
             raise e
 
     @staticmethod
     async def get_agent_by_id(db: AsyncSession, agent_id: str) -> Optional["AgentModel"]:
-        """
-        Finds a single agent by their unique business ID (agent_id).
-        """
         query = select(AgentModel).where(AgentModel.agent_id == agent_id)
         result = await db.execute(query)
         return result.scalar_one_or_none()
 
     @staticmethod
     async def update_agent(db: AsyncSession, agent_id: str, update_data: Dict[str, Any]) -> int:
-        """
-        Updates agent details in SQL.
-        """
         query = select(AgentModel).where(AgentModel.agent_id == agent_id)
         result = await db.execute(query)
         agent = result.scalar_one_or_none()
