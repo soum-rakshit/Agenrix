@@ -8,7 +8,7 @@ const COLUMNS = {
     { id: 'agent_id', label: 'Agent ID' },
     { id: 'agent_name', label: 'Agent Name' },
     { id: 'owner', label: 'Owner' },
-    { id: 'agent_source', label: 'Source' }, // Adjusted to match agent_source in your schema
+    { id: 'agent_source', label: 'Source' },
     { id: 'authorized_by', label: 'Authorized By' },
     { id: 'subscription_plan', label: 'Subscription Plan' },
     { id: 'contributors', label: 'Contributors' }
@@ -102,8 +102,8 @@ export default function DataExplorer() {
     agent_id: true,
     agent_name: true,
     owner: true,
-    agent_source: false, // Updated to match your schema
-    authorized_by: true, // Added from schema
+    agent_source: false,
+    authorized_by: true,
     subscription_plan: true,
     contributors: false,
     tools: false,
@@ -125,19 +125,24 @@ export default function DataExplorer() {
       agent_id: item.agent_id,
       agent_name: item.agent_name,
       owner: item.owner,
-      agent_source: item.agent_source, // Updated to match schema
-      authorized_by: item.authorized_by, // Included based on schema
-      subscription_plan: item.subscription_plan, // Included based on schema
+      agent_source: item.agent_source,
+      authorized_by: item.authorized_by,
+      subscription_plan: item.subscription_plan,
       contributors: item.contributors,
     };
 
-    // Flatten access rights
+    
     Object.keys(COLUMNS.accessRights).forEach((_, i) => {
       const key = COLUMNS.accessRights[i].id;
       flattened[key] = item.access_rights?.[key]?.join(' | ') || '';
     });
 
-    // Flatten Telemetry
+    Object.keys(COLUMNS.accessRights).forEach((_, i) => {
+      const key = COLUMNS.accessRights[i].id;
+      flattened[key] = item.access_rights?.[key]?.join(' | ') || '';
+    });
+
+    
     flattened.activity_logs = item.activity_logs?.map(log => `${log.action} (${log.duration_min}m)`).join(' | ') || '';
     flattened.external_comms = item.external_comms?.map(comm => comm.recipient).join(' | ') || '';
 

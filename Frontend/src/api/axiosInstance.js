@@ -10,8 +10,6 @@ const api = axios.create({
 
 api.interceptors.response.use(
   (response) => {
-    // We can show success toasts here for specific methods if we want
-    // But usually better to handle it per-request for POST/PUT/DELETE
     return response;
   },
   (error) => {

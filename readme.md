@@ -41,11 +41,5 @@ The project is split into two independent modules. **Please refer to the individ
 
 ---
 
-<!-- ## 👥 Contributors
-
-* **Soum Rakshit** - [GitHub Profile](https://github.com/soum-rakshit) -->
-
----
-
 ### 📝 Note
 Ensure both your **PostgreSQL** and **MongoDB** instances are reachable before starting the backend. See the [Backend README](./Backend/README.md) for connection string formats.
