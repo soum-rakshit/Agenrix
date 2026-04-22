@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update
@@ -41,7 +42,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI()
 
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/", include_in_schema=False)
@@ -199,32 +206,7 @@ async def update_agent(
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@app.delete("/delete_agent/{agent_id}")
-async def delete_agent(
-    agent_id: str, 
-    db: AsyncSession = Depends(get_sql_db)
-):
-    query = select(AgentModel).where(AgentModel.agent_id == agent_id)
-    result = await db.execute(query)
-    agent = result.scalar_one_or_none()
-
-    if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
-
-    try:
-        await db.delete(agent)
-        await db.commit()
-        
-        return {
-            "status": "success", 
-            "message": f"Agent {agent_id} has been permanently deleted."
-        }
-    except Exception as e:
-        await db.rollback()
-        print(f"Delete Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
-    
+  
 
 @app.post("/add_agent_activity")
 async def add_agent_activity(
