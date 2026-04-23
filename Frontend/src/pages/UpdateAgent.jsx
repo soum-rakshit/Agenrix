@@ -262,7 +262,7 @@ export default function UpdateAgent() {
                             </button>
 
                             {filterOpen && (
-                                <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-800 border border-border rounded-md shadow-2xl z-50 p-4 max-h-96 overflow-y-auto">
+                                <div className="absolute top-full right-0 mt-2 w-64 bg-card border border-border rounded-md shadow-2xl z-50 p-4 max-h-96 overflow-y-auto">
                                     <div className="flex justify-between items-center mb-4 border-b border-border pb-2">
                                         <span className="text-sm font-semibold text-foreground">
                                             Visible Fields

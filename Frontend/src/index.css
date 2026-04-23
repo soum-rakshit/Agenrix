@@ -9,6 +9,12 @@
   --color-light-bg: #f8fafc;
   --color-light-card: #ffffff;
   --color-light-border: #e2e8f0;
+  
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
 }
 
 @layer base {
