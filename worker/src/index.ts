@@ -8,6 +8,9 @@ import {
 } from "./infrastructure/logger/pino.logger.infrastructure";
 import { setupMiddleware } from "./middlewares/setup.middleware";
 import router from "./router";
+import { serve } from "inngest/hono";
+import { inngestClient } from "./infrastructure/workflows/inngest.workflows.infrastructure";
+import { repositoryAnalysisWorkflow } from "./workflows/agent/repository-analysis.workflow";
 
 const app = new Hono();
 
@@ -20,6 +23,12 @@ app.use(
 );
 
 app.route("/v1", router);
+
+app.on(
+  ["GET", "POST", "PUT"],
+  "/api/inngest",
+  serve({ client: inngestClient, functions: [repositoryAnalysisWorkflow] }),
+);
 
 const server = Bun.serve({
   fetch: app.fetch,

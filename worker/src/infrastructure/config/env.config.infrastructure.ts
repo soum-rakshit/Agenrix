@@ -7,6 +7,8 @@ export const env = createEnv({
       .enum(["fatal", "error", "warn", "info", "debug", "trace"])
       .default("info"),
     PORT: z.coerce.number().default(3000),
+    GOOGLE_GENERATIVE_AI_API_KEY: z.string(),
+    E2B_API_KEY: z.string(),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,
