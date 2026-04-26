@@ -171,6 +171,7 @@ export const repositoryAnalysisWorkflow = inngestClient.createFunction(
             {
               cwd: repositoryPath,
               onStdout: (data) => {
+                // todo: also send the data to a backend webhook to ingest the agent logss
                 captureJsonLines(stdoutCapture, String(data), (line) => {
                   const text = getTextPart(line);
 
