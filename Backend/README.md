@@ -106,9 +106,8 @@ OpenAPI JSON: [http://127.0.0.1:{PORT}/openapi.json](http://127.0.0.1:{PORT}/ope
 
 | Method | Path                             | Description                                                                                                                       |
 | ------ | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/add_agent_activity`            | Log high-frequency internal agent actions using the Bucket Pattern. Stores activity in MongoDB. Returns `404` if agent not found. |
-| `POST` | `/add_external_comm`             | Log sensitive data sharing and external communications with automatic compliance tracking. Returns compliance check status.       |
-| `GET`  | `/get_agent_activity/{agent_id}` | Retrieve all activity logs and external communications for an agent. Returns activities and communications summaries.             |
+| `POST` | `/log_agent_work`                | Unified endpoint to log high-frequency internal actions (Bucket Pattern) and external communications simultaneously. Expects `WorkerRawLog` schema. |
+| `GET`  | `/get_agent_activity`            | Retrieve and filter activity logs and external communications with advanced query parameters (time, file name, confidentiality, etc.). |
 
 ---
 
@@ -234,11 +233,11 @@ curl -X GET "http://127.0.0.1:8000/agents?status=Active&limit=10"
 
 ---
 
-## POST /add_agent_activity — Log Agent Activity
+## POST /log_agent_work — Unified Agent Logging
 
-Records high-frequency internal agent actions using MongoDB's Bucket Pattern for efficient storage and retrieval.
+Records high-frequency internal agent actions (using MongoDB's Bucket Pattern for efficient storage) and external communications (with compliance checking) in a single unified payload.
 
-**Request Body:**
+**Request Body (`WorkerRawLog`):**
 
 ```json
 {
@@ -249,52 +248,15 @@ Records high-frequency internal agent actions using MongoDB's Bucket Pattern for
         "action": "data_access",
         "duration_min": 5,
         "files_altered": ["file1.txt", "file2.csv"]
-    }
-}
-```
-
-**Response codes:**
-
-- `200` — Success. Activity logged in hourly bucket.
-- `404` — Agent not found in PostgreSQL.
-- `500` — Internal server error.
-
-**Example:**
-
-```bash
-curl -X POST http://127.0.0.1:8000/add_agent_activity \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent_id": "agent_001",
-    "event": {
-      "session_id": "sess_123",
-      "used_by": "john_doe",
-      "action": "file_access",
-      "duration_min": 10,
-      "files_altered": ["report.pdf"]
-    }
-  }'
-```
-
----
-
-## POST /add_external_comm — Log External Communication
-
-Logs sensitive data sharing events with automatic compliance flag calculation. Used for audit trails and regulatory compliance.
-
-**Request Body:**
-
-```json
-{
-    "agent_id": "agent_001",
-    "recipient": "recipient@example.com",
+    },
+    "recipient": "analyst@company.com",
     "data_shared": [
         {
-            "item": "customer_database",
-            "classification": "confidential",
-            "is_confidential": true,
-            "location_path": "/data/customers",
-            "encryption_status": "AES-256"
+            "item": "sales_report",
+            "classification": "internal",
+            "is_confidential": false,
+            "location_path": "/reports/sales",
+            "encryption_status": "None"
         }
     ]
 }
@@ -302,77 +264,65 @@ Logs sensitive data sharing events with automatic compliance flag calculation. U
 
 **Response codes:**
 
-- `200` — Success. Communication logged with compliance check complete.
-- `404` — Agent not found.
-- `500` — Internal server error.
+- `200` — Success. Both activity and communication logs processed.
+- `500` — Internal server error during unified logging.
 
 **Example:**
 
 ```bash
-curl -X POST http://127.0.0.1:8000/add_external_comm \
+curl -X POST http://127.0.0.1:8000/log_agent_work \
   -H "Content-Type: application/json" \
-  -d '{
-    "agent_id": "agent_001",
-    "recipient": "analyst@company.com",
-    "data_shared": [
-      {
-        "item": "sales_report",
-        "classification": "internal",
-        "is_confidential": false,
-        "location_path": "/reports/sales",
-        "encryption_status": "None"
-      }
-    ]
-  }'
+  -d '{ ... }'
 ```
 
 ---
 
-## GET /get_agent_activity/{agent_id} — Retrieve Agent Activity & Communications
+## GET /get_agent_activity — Retrieve & Filter Agent Activity
 
-Fetches all activity logs and external communications for a specific agent across all time periods.
+Fetches activity logs and external communications with advanced filtering capabilities across all time periods and parameters.
 
-**Path Parameters:**
+**Query Parameters:**
 
-- `agent_id` (string, required) — The unique identifier of the agent
+- `agent_id` (string, optional) — The unique identifier of the agent.
+- `start_time` (datetime, optional) — ISO 8601 start time.
+- `end_time` (datetime, optional) — ISO 8601 end time.
+- `file_name` (string, optional) — Filter activities by specific files altered.
+- `classification` (string, optional) — Filter comms by classification.
+- `is_confidential` (boolean, optional) — Filter comms by confidentiality.
+- `encryption_status` (string, optional) — Filter comms by encryption status.
 
 **Response:**
 
 ```json
 {
-  "agent_id": "agent_001",
-  "total_activities": 1,
-  "total_external_comms": 1,
+  "search_filter": {
+    "agent_id": "agent_001",
+    "time_range": "2026-04-21T00:00:00Z to 2026-04-22T00:00:00Z"
+  },
+  "summary": {
+    "activity_count": 1,
+    "communication_count": 1
+  },
   "data": {
-    "activity_logs": [
+    "activities": [
       {
         "agent_id": "agent_001",
-        "hour": "2026-04-21T14:00:00Z",
-        "events": [
-          {
-            "session_id": "sess_123",
-            "used_by": "operator_name",
-            "action": "data_access",
-            "duration_min": 5,
-            "files_altered": ["file1.txt"]
-          }
-        ]
+        "session_id": "sess_123",
+        "used_by": "operator_name",
+        "action": "data_access",
+        "timestamp": "2026-04-21T14:00:00Z",
+        "files_altered": ["file1.txt"],
+        "duration_min": 5
       }
     ],
-    "external_communications": [
+    "communications": [
       {
         "agent_id": "agent_001",
         "recipient": "recipient@example.com",
-        "data_shared": [
-          {
-            "item": "sales_report",
-            "classification": "internal",
-            "is_confidential": false,
-            "location_path": "/reports/sales",
-            "encryption_status": "None"
-          }
-        ],
-        "timestamp": "2026-04-21T14:30:00Z"
+        "data_shared": [ ... ],
+        "timestamp": "2026-04-21T14:30:00Z",
+        "compliance_flag": "Green",
+        "_id": "60a1b2c3d4e5f6a7b8c9d0e1"
       }
     ]
   }
@@ -381,14 +331,14 @@ Fetches all activity logs and external communications for a specific agent acros
 
 **Response codes:**
 
-- `200` — Success. Returns all activities and communications for the agent.
-- `404` — No activity found or agent not found.
+- `200` — Success. Returns filtered activities and communications. (Returns empty arrays if no matches).
+- `422` — Validation Error (e.g. invalid datetime string).
 - `500` — Internal server error.
 
 **Example:**
 
 ```bash
-curl -X GET http://127.0.0.1:8000/get_agent_activity/agent_001
+curl -X GET "http://127.0.0.1:8000/get_agent_activity?agent_id=agent_001&file_name=report.pdf"
 ```
 
 ---

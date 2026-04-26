@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 class SharedData(BaseModel):
     item: str
@@ -15,6 +15,7 @@ class EventEntry(BaseModel):
     action: str
     duration_min: int
     files_altered: List[str] = []
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class AccessRights(BaseModel):
     tools: List[str] = []
@@ -40,7 +41,17 @@ class ExternalCommInput(BaseModel):
     agent_id: str
     recipient: EmailStr
     data_shared: List[SharedData]
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ActivityInput(BaseModel):
     agent_id: str
     event: EventEntry
+
+class AgentFilter(BaseModel):
+    agent_id: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    file_name: Optional[str] = None
+    classification: Optional[str] = None
+    is_confidential: Optional[bool] = None
+    encryption_status: Optional[str] = None

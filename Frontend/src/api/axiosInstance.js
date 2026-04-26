@@ -17,13 +17,13 @@ api.interceptors.response.use(
     const message = error.response?.data?.message || error.message || "An error occurred";
 
     if (status === 400) {
-      toast.error(`Bad Request: ${message}`);
+      console.log(`Bad Request: ${message}`);
     } else if (status === 404) {
-      toast.error(`Not Found: ${message}`);
+      console.log(`Not Found: ${message}`);
     } else if (status === 500) {
-      toast.error(`Server Error: ${message}`);
+      console.log(`Server Error: ${message}`);
     } else {
-      toast.error(`Error: ${message}`);
+      console.log(`Error: ${message}`);
     }
 
     return Promise.reject(error);

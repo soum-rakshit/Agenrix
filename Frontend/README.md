@@ -99,7 +99,8 @@ npm run preview
 
 ## Key Features
 
-- **Axios Integration**: Pre-configured HTTP client for backend communication with automatic CORS handling
+- **Data Explorer**: Advanced search interface capable of filtering complex, unified agent telemetry across time, file names, classification, and confidentiality with dynamic column selection.
+- **Axios Integration**: Pre-configured HTTP client for backend communication. Global errors gracefully intercepted without interrupting search filtering logic.
 - **Form Management**: React Hook Form for efficient form state and validation
 - **Routing**: React Router for seamless multi-page navigation
 - **Notifications**: Toast notifications with react-hot-toast and sonner
@@ -160,6 +161,12 @@ import api from "./api/axiosInstance";
 
 // GET request
 const agents = await api.get("/agents");
+
+// GET agent activity with telemetry filters
+const activity = await api.get(`/get_agent_activity?agent_id=${agentId}&start_time=2026-04-21T00:00:00.000Z`);
+
+// POST log unified agent work
+const newLog = await api.post("/log_agent_work", logData);
 
 // POST request
 const newAgent = await api.post("/add_agent", agentData);

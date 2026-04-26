@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import APIRouter, FastAPI, HTTPException, Depends, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,7 @@ from config.settings import settings
 from schema.schemas import AgentCreate, ActivityInput, ExternalCommInput
 from models.agent_model_sql import AgentModel
 from models.agent_activity_model import NoSQLModel
-
+from pydantic import ValidationError
 from typing import List, Optional
 from sqlalchemy import select
 import uvicorn
@@ -87,9 +87,6 @@ async def add_agent(
         print(f"Internal Error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-
-
-
 @app.get("/agents", response_model=List[AgentCreate])
 async def get_agents(
     agent_id: Optional[str] = None,
@@ -154,9 +151,6 @@ async def get_agents(
 
     return agents
 
-
-
-
 @app.patch("/update_agent/{agent_id}")
 async def update_agent(
     agent_id: str, 
@@ -206,81 +200,84 @@ async def update_agent(
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-  
-
-@app.post("/add_agent_activity")
-async def add_agent_activity(
-    activity_data: ActivityInput, 
+@app.post("/log_agent_work")
+async def log_agent_work(
+    log_data: WorkerRawLog, 
     db: AsyncSession = Depends(get_sql_db)
 ):
-    exists = await AgentModel.check_exists(db, activity_data.agent_id)
+    exists = await AgentModel.check_exists(db, log_data.agent_id)
     if not exists:
         raise HTTPException(status_code=404, detail="Agent identity not found in SQL")
+
     try:
-        event_dict = activity_data.event.model_dump()
-        result = await NoSQLModel.log_activity_bucket(
-            activity_data.agent_id, 
-            event_dict
+        event_dict = log_data.event.model_dump()
+        event_dict["timestamp"] = log_data.event.timestamp 
+        
+        await NoSQLModel.log_activity_bucket(log_data.agent_id, event_dict)
+        comm_dict = {
+            "agent_id": log_data.agent_id,
+            "recipient": log_data.recipient,
+            "data_shared": [item.model_dump() for item in log_data.data_shared],
+            "timestamp": log_data.timestamp
+        }
+        await NoSQLModel.add_external_comm(comm_dict)
+
+        return {
+            "status": "success",
+            "message": "Activity and Communication logs synchronized",
+            "agent_id": log_data.agent_id
+        }
+
+    except Exception as e:
+        print(f"Unified Logging Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process unified log")
+    
+@app.get("/get_agent_activity")
+async def get_agent_activity(
+    agent_id: Optional[str] = None,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    file_name: Optional[str] = None,
+    classification: Optional[str] = None,
+    is_confidential: Optional[bool] = None,
+    encryption_status: Optional[str] = None
+):
+    try:
+        results = await NoSQLModel.search_agent_records(
+            agent_id=agent_id,
+            start_dt=start_time,
+            end_dt=end_time,
+            file_name=file_name,
+            classification=classification,
+            is_confidential=is_confidential,
+            encryption_status=encryption_status
         )
-        
-        return {
-            "status": "success",
-            "message": "Activity captured in hourly bucket",
-            "agent_id": activity_data.agent_id
-        }
-    except Exception as e:
-        print(f"Logging Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to log activity")
 
-@app.post("/add_external_comm")
-async def add_external_comm(comm_data: ExternalCommInput, db: AsyncSession = Depends(get_sql_db)):
-    exists = await AgentModel.check_exists(db,  comm_data.agent_id)
-    if not exists:
-        raise HTTPException(status_code=404, detail="Agent identity not found in SQL")
-    
-    try:
-        comm_dict = comm_data.model_dump()
-        result = await NoSQLModel.add_external_comm(comm_dict)
-        
-        return {
-            "status": "success",
-            "id": str(result.inserted_id),
-            "compliance_check": "Complete"
-        }
-    except Exception as e:
-        print(f"Comm Audit Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to log communication")
-    
-
-    
-
-@app.get("/get_agent_activity/{agent_id}")
-async def get_agent_activity(agent_id: str):
-    try:
-        activities = await NoSQLModel.get_all_activities(agent_id)
-        communications = await NoSQLModel.get_all_communications(agent_id)
-
-        if not activities and not communications:
-            raise HTTPException(status_code=404, detail="No activity found for this Agent ID")
+        if not results["activities"] and not results["communications"]:
+            raise HTTPException(
+                status_code=404, 
+                detail="No records found matching these filters"
+            )
 
         return {
-            "agent_id": agent_id,
-            "total_activities": len(activities),
-            "total_external_comms": len(communications),
-            "data": {
-                "activity_logs": activities,
-                "external_communications": communications
-            }
+            "search_filter": {
+                "agent_id": agent_id or "All Agents",
+                "time_range": f"{start_time} to {end_time}" if start_time else "All Time"
+            },
+            "summary": {
+                "activity_count": len(results["activities"]),
+                "communication_count": len(results["communications"])
+            },
+            "data": results
         }
-    
+
     except HTTPException as he:
         raise he
-        
     except Exception as e:
-        print(f"Error fetching activity: {e}")
+        print(f"Error fetching filtered activity: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
-
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=settings.PORT, reload=True)

@@ -21,8 +21,13 @@ const COLUMNS = {
     { id: 'servers', label: 'Servers' }
   ],
   telemetry: [
-    { id: 'activity_logs', label: 'Activity Logs' },
-    { id: 'external_comms', label: 'External Comms' }
+    { id: 'files_altered', label: 'Files Altered' },
+    { id: 'classification', label: 'Classification' },
+    { id: 'is_confidential', label: 'Confidentiality' },
+    { id: 'location_path', label: 'Location Path' },
+    { id: 'encryption_status', label: 'Encryption Status' },
+    { id: 'start_time', label: 'Start Time' },
+    { id: 'end_time', label: 'End Time' }
   ]
 };
 
@@ -52,19 +57,89 @@ export default function DataExplorer() {
       };
 
       const queryParams = new URLSearchParams();
+      const telemetryParamKeys = [
+        'start_time', 'end_time', 'files_altered', 'classification', 
+        'is_confidential', 'location_path', 'encryption_status'
+      ];
+      const telemetryQueryParams = new URLSearchParams();
+
       Object.entries(searchParams).forEach(([key, value]) => {
         if (value && value.trim() !== '') {
           const mappedKey = paramMap[key];
           if (mappedKey) {
             queryParams.append(mappedKey, value.trim());
           }
+          if (telemetryParamKeys.includes(key)) {
+            let backendKey = key;
+            if (key === 'files_altered') backendKey = 'file_name';
+            
+            let finalValue = value.trim();
+            if (key === 'start_time' || key === 'end_time') {
+              const dateObj = new Date(finalValue);
+              if (!isNaN(dateObj.getTime())) {
+                finalValue = dateObj.toISOString();
+              }
+            }
+            telemetryQueryParams.append(backendKey, finalValue);
+          }
         }
       });
 
       const response = await api.get(`/agents?${queryParams.toString()}`);
-      setData(response.data);
+      
+      const telemetryQueryString = telemetryQueryParams.toString();
+
+      const agentsWithActivity = await Promise.all(
+        response.data.map(async (agent) => {
+          try {
+            const url = telemetryQueryString 
+              ? `/get_agent_activity?agent_id=${agent.agent_id}&${telemetryQueryString}` 
+              : `/get_agent_activity?agent_id=${agent.agent_id}`;
+            const activityResponse = await api.get(url);
+            return {
+              ...agent,
+              activities: activityResponse.data.data.activities || [],
+              communications: activityResponse.data.data.communications || []
+            };
+          } catch (err) {
+            return {
+              ...agent,
+              activities: [],
+              communications: []
+            };
+          }
+        })
+      );
+
+      const hasSpecificActivityFilter = ['files_altered'].some(key => searchParams[key] && searchParams[key].trim() !== '');
+      const hasSpecificCommFilter = ['classification', 'is_confidential', 'encryption_status', 'location_path'].some(key => searchParams[key] && searchParams[key].trim() !== '');
+      const hasTimeFilter = ['start_time', 'end_time'].some(key => searchParams[key] && searchParams[key].trim() !== '');
+      const hasAnyTelemetryFilter = hasSpecificActivityFilter || hasSpecificCommFilter || hasTimeFilter;
+
+      const filteredAgents = agentsWithActivity.filter(agent => {
+        if (!hasAnyTelemetryFilter) return true;
+        
+        let hasActivities = agent.activities && agent.activities.length > 0;
+        let hasComms = agent.communications && agent.communications.length > 0;
+
+        const locPathSearch = searchParams['location_path']?.trim().toLowerCase();
+        if (locPathSearch && hasComms) {
+          hasComms = agent.communications.some(comm => 
+            comm.data_shared?.some(data => data.location_path?.toLowerCase().includes(locPathSearch))
+          );
+        }
+        
+        if (hasSpecificActivityFilter && !hasActivities) return false;
+        if (hasSpecificCommFilter && !hasComms) return false;
+        if (!hasSpecificActivityFilter && !hasSpecificCommFilter && hasTimeFilter) {
+          if (!hasActivities && !hasComms) return false;
+        }
+
+        return true;
+      });
+
+      setData(filteredAgents);
     } catch (error) {
-      toast.error('Failed to load agents data');
       console.error('Error fetching agents:', error);
     } finally {
       setIsLoading(false);
@@ -113,6 +188,13 @@ export default function DataExplorer() {
     servers: false,
     activity_logs: false,
     external_comms: false,
+    files_altered: false,
+    classification: false,
+    is_confidential: false,
+    location_path: false,
+    encryption_status: false,
+    start_time: false,
+    end_time: false
   });
 
   const [activeSearchFields, setActiveSearchFields] = useState({});
@@ -131,20 +213,57 @@ export default function DataExplorer() {
       contributors: item.contributors,
     };
 
-    
-    Object.keys(COLUMNS.accessRights).forEach((_, i) => {
-      const key = COLUMNS.accessRights[i].id;
-      flattened[key] = item.access_rights?.[key]?.join(' | ') || '';
-    });
-
     Object.keys(COLUMNS.accessRights).forEach((_, i) => {
       const key = COLUMNS.accessRights[i].id;
       flattened[key] = item.access_rights?.[key]?.join(' | ') || '';
     });
 
     
-    flattened.activity_logs = item.activity_logs?.map(log => `${log.action} (${log.duration_min}m)`).join(' | ') || '';
-    flattened.external_comms = item.external_comms?.map(comm => comm.recipient).join(' | ') || '';
+    flattened.activity_logs = item.activities?.map(log => `${log.action} (${log.duration_min}m)`).join(' | ') || '';
+    flattened.external_comms = item.communications?.map(comm => comm.recipient).join(' | ') || '';
+
+    const allFiles = new Set();
+    item.activities?.forEach(log => {
+      log.files_altered?.forEach(f => allFiles.add(f));
+    });
+    flattened.files_altered = Array.from(allFiles).join(', ') || '';
+
+    const classifications = new Set();
+    const confidentialities = new Set();
+    const encryptionStatuses = new Set();
+    const locationPaths = new Set();
+    
+    item.communications?.forEach(comm => {
+      comm.data_shared?.forEach(data => {
+        if (data.classification) classifications.add(data.classification);
+        if (data.is_confidential !== undefined) confidentialities.add(data.is_confidential ? 'Yes' : 'No');
+        if (data.encryption_status) encryptionStatuses.add(data.encryption_status);
+        if (data.location_path) locationPaths.add(data.location_path);
+      });
+    });
+    
+    flattened.classification = Array.from(classifications).join(', ') || '';
+    flattened.is_confidential = Array.from(confidentialities).join(', ') || '';
+    flattened.encryption_status = Array.from(encryptionStatuses).join(', ') || '';
+    flattened.location_path = Array.from(locationPaths).join(', ') || '';
+    
+    let allTimestamps = [];
+    item.activities?.forEach(log => {
+      if (log.timestamp) allTimestamps.push(new Date(log.timestamp).getTime());
+    });
+    item.communications?.forEach(comm => {
+      if (comm.timestamp) allTimestamps.push(new Date(comm.timestamp).getTime());
+    });
+    
+    if (allTimestamps.length > 0) {
+      const min = new Date(Math.min(...allTimestamps));
+      const max = new Date(Math.max(...allTimestamps));
+      flattened.start_time = min.toLocaleString();
+      flattened.end_time = max.toLocaleString();
+    } else {
+      flattened.start_time = '';
+      flattened.end_time = '';
+    }
 
     return flattened;
   };
@@ -278,7 +397,7 @@ export default function DataExplorer() {
               <ChevronDown className="w-4 h-4" />
             </button>
 
-            {/* Columns Dropdown */}
+            
             {filterOpen && (
               <div className="absolute top-full right-0 mt-2 w-64 bg-card border border-border rounded-md shadow-2xl z-50 p-4 max-h-96 overflow-y-auto">
               <div className="flex justify-between items-center mb-4 border-b border-border pb-2">
@@ -348,7 +467,7 @@ export default function DataExplorer() {
         </div>
       </div>
 
-      {/* Advanced Search Panel */}
+      
       {searchOpen && (
         <div className="bg-card border border-border rounded-lg p-4 mb-6 shadow-sm animate-in slide-in-from-top-2 relative">
           <div className="flex justify-between items-center mb-4">
@@ -468,7 +587,7 @@ export default function DataExplorer() {
                   <label className="text-xs font-medium text-foreground/70">{label}</label>
                   <div className="flex items-center gap-2">
                     <input
-                      type="text"
+                      type={key === 'start_time' || key === 'end_time' ? 'datetime-local' : 'text'}
                       value={searchValues[key] || ''}
                       onChange={(e) => {
                         setSearchValues(prev => ({ ...prev, [key]: e.target.value }));
@@ -478,7 +597,7 @@ export default function DataExplorer() {
                           handleBackendSearch();
                         }
                       }}
-                      placeholder={`Search ${label}...`}
+                      placeholder={key === 'start_time' || key === 'end_time' ? '' : `Search ${label}...`}
                       className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
                     <button
@@ -557,7 +676,7 @@ export default function DataExplorer() {
           </table>
         </div>
 
-        {/* Pagination */}
+        
         <div className="p-4 border-t border-border flex items-center justify-between bg-foreground/5">
           <p className="text-sm text-foreground/60">
             Showing <span className="font-medium text-foreground">{filteredData.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}</span> to <span className="font-medium text-foreground">{Math.min(currentPage * PAGE_SIZE, filteredData.length)}</span> of <span className="font-medium text-foreground">{filteredData.length}</span> results

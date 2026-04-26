@@ -97,10 +97,10 @@ export default function UpdateAgent() {
                     toast.success("Agent details loaded");
                 }
             } else {
-                toast.error("Agent not found");
+                console.log("Agent not found");
             }
         } catch (error) {
-            toast.error(error.message || "Failed to fetch agent");
+            console.log(error.message || "Failed to fetch agent");
         } finally {
             setIsSearching(false);
         }
@@ -192,7 +192,7 @@ export default function UpdateAgent() {
                 mode="update"
             />
 
-            {/* Search Bar */}
+            
             <div className="bg-card border border-border p-6 rounded-lg shadow-sm mb-8">
                 <form onSubmit={handleSearch} className="flex gap-4 items-end">
                     <div className="flex-1">
@@ -239,7 +239,7 @@ export default function UpdateAgent() {
                 </form>
             </div>
 
-            {/* Update Form */}
+            
             {agentFound && (
                 <form
                     onSubmit={handleSubmit(onSubmit)}
@@ -382,7 +382,7 @@ export default function UpdateAgent() {
                     </div>
 
                     <div className="space-y-6">
-                        {/* Read-Only Identity Fields */}
+                        
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-foreground/5 p-4 rounded-md border border-border/50">
                             <div>
                                 <label className="block text-sm font-medium text-foreground/70 mb-1">
@@ -406,7 +406,7 @@ export default function UpdateAgent() {
                             </div>
                         </div>
 
-                        {/* Dynamic Editable Fields */}
+                        
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {visibleFields.owner && (
                                 <div>
@@ -460,7 +460,7 @@ export default function UpdateAgent() {
                             )}
                         </div>
 
-                        {/* Dynamic Access Rights */}
+                        
                         <div className="space-y-4 pt-2">
                             {visibleFields.tools && (
                                 <div>

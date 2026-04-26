@@ -221,7 +221,7 @@ export default function BulkImportModal({ isOpen, onClose, mode, onSuccess }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-card w-full max-w-4xl rounded-lg shadow-xl border border-border flex flex-col max-h-[90vh]">
-                {/* Header */}
+                
                 <div className="flex justify-between items-center p-6 border-b border-border">
                     <div>
                         <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
@@ -242,9 +242,9 @@ export default function BulkImportModal({ isOpen, onClose, mode, onSuccess }) {
                     </button>
                 </div>
 
-                {/* Body */}
+                
                 <div className="p-6 flex-1 overflow-y-auto">
-                    {/* Controls */}
+                    
                     <div className="flex justify-between items-center mb-6">
                         <div className="flex items-center gap-4">
                             <input
@@ -276,7 +276,7 @@ export default function BulkImportModal({ isOpen, onClose, mode, onSuccess }) {
                         </button>
                     </div>
 
-                    {/* Results Summary */}
+                    
                     {results && (
                         <div
                             className={`p-4 rounded-md mb-6 flex items-start gap-3 ${results.failed > 0 ? "bg-red-500/10 border border-red-500/20" : "bg-green-500/10 border border-green-500/20"}`}
@@ -303,7 +303,7 @@ export default function BulkImportModal({ isOpen, onClose, mode, onSuccess }) {
                         </div>
                     )}
 
-                    {/* Progress Bar */}
+                    
                     {isUploading && (
                         <div className="mb-6">
                             <div className="flex justify-between text-xs font-medium text-foreground/70 mb-2">
@@ -323,7 +323,7 @@ export default function BulkImportModal({ isOpen, onClose, mode, onSuccess }) {
                         </div>
                     )}
 
-                    {/* Preview Table */}
+                    
                     {parsedData.length > 0 && !results && (
                         <div className="border border-border rounded-md overflow-hidden">
                             <div className="bg-foreground/5 px-4 py-2 border-b border-border">
@@ -391,7 +391,7 @@ export default function BulkImportModal({ isOpen, onClose, mode, onSuccess }) {
                     )}
                 </div>
 
-                {/* Footer */}
+                
                 <div className="p-6 border-t border-border flex justify-end gap-3 bg-foreground/5 rounded-b-lg">
                     <button
                         onClick={handleClose}
