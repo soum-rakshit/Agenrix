@@ -1,0 +1,16 @@
+<svg width="420" height="80" viewBox="0 0 420 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  
+  <g transform="translate(0,10)">
+    <rect x="0" y="0" width="14" height="14" rx="3" fill="#E6EAF2"/>
+    <rect x="18" y="0" width="14" height="14" rx="3" fill="#E6EAF2"/>
+    <rect x="36" y="0" width="14" height="14" rx="3" fill="#E6EAF2"/>
+    <rect x="0" y="18" width="14" height="14" rx="3" fill="#E6EAF2"/>
+    <rect x="18" y="18" width="14" height="14" rx="3" fill="#E6EAF2"/>
+    <rect x="36" y="18" width="14" height="14" rx="3" fill="#F5C518"/>
+    <rect x="0" y="36" width="14" height="14" rx="3" fill="#E6EAF2"/>
+    <rect x="18" y="36" width="14" height="14" rx="3" fill="#F5C518"/>
+    <rect x="36" y="36" width="14" height="14" rx="3" fill="#F5C518"/>
+  </g>
+  <text x="70" y="45" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="600" letter-spacing="-1" fill="#E6EAF2">agen<tspan fill="#F5C518">RIX</tspan></text>
+  <text x="70" y="68" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="400" fill="#9CA3AF">See every agent | Know every risk</text>
+</svg>

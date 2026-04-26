@@ -248,7 +248,49 @@ export const repositoryAnalysisWorkflow = inngestClient.createFunction(
         },
       );
 
+
       // todo: send the output to the backend webhook url
+
+      await step.run("send-to-backend", async () => {
+        const backendPayload = {
+          agent_id: "repository-analyzer-bot", // Mandatory
+
+          event: {
+            action: "repository_analysis",
+            // Include evidence files here for quick SQL-side filtering if needed
+            files_altered: result?.evidenceFiles || []
+          },
+
+          data_shared: [
+            {
+              item: "repository_scan_report",
+              classification: result?.classification || "NOT_AGENT",
+              // Storing the detailed audit results in metadata for NoSQL storage
+              metadata: {
+                agent_signals: result?.agentSignals || [],
+                evidence_files: result?.evidenceFiles || [],
+                reasoning: result?.reasoning || "No reasoning provided",
+                frameworks: result?.frameworksDetected || []
+              }
+            }
+          ]
+        };
+
+        const response = await fetch(`${env.BACKEND_API_URL}/log_agent_work`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(backendPayload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`Backend returned ${response.status}`);
+        }
+
+        return await response.json();
+      });
+
 
       return result;
     } catch (error) {

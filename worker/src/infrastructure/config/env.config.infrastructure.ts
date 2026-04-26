@@ -12,6 +12,7 @@ export const env = createEnv({
     INNGEST_DEV: z.coerce.number().default(1),
     INNGEST_API_BASE_URL: z.url().default("http://127.0.0.1:8288"),
     INNGEST_SIGNING_KEY: z.string().optional(),
+    BACKEND_API_URL: z.url().default("http://127.0.0.1:8000"),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,

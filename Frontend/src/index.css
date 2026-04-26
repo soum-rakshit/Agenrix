@@ -1,17 +1,12 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #3b82f6;
-  --color-primary-hover: #2563eb;
-  --color-dark-bg: #0f172a;
-  --color-dark-card: #1e293b;
-  --color-dark-border: #334155;
-  --color-light-bg: #f8fafc;
-  --color-light-card: #ffffff;
-  --color-light-border: #e2e8f0;
+  --color-primary: #FFC700;
+  --color-primary-hover: #e6b300;
   
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
   --color-card: var(--card);
   --color-border: var(--border);
   --color-ring: var(--ring);
@@ -19,19 +14,21 @@
 
 @layer base {
   :root {
-    --background: var(--color-light-bg);
-    --foreground: #0f172a;
-    --card: var(--color-light-card);
-    --border: var(--color-light-border);
-    --ring: var(--color-primary);
+    --background: #fafafa;
+    --foreground: #121212;
+    --muted: #e5e5e5;
+    --card: #ffffff;
+    --border: #f0f0f0;
+    --ring: #FFC700;
   }
 
   .dark {
-    --background: var(--color-dark-bg);
-    --foreground: #f8fafc;
-    --card: var(--color-dark-card);
-    --border: var(--color-dark-border);
-    --ring: var(--color-primary);
+    --background: #121212;
+    --foreground: #FFFFFF;
+    --muted: #888888;
+    --card: #181818;
+    --border: #2a2a2a;
+    --ring: #FFC700;
   }
 
   body {

@@ -13,11 +13,14 @@ class AgentModel(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     agent_id = Column(String(50), unique=True, index=True, nullable=False)
     agent_name = Column(String(100))
-    agent_source = Column(String(255))
+    source_repo_id = Column(String(255))
     agent_description = Column(String(500))
     owner = Column(String(100))
     authorized_by = Column(String(100))
     subscription_plan = Column(String(50))
+    status = Column(String(50), default="Active")
+    classification = Column(String(50), nullable=True)
+    confidence = Column(String(50), nullable=True)
     
     contributors = Column(JSONB)
     access_rights = Column(JSONB)
@@ -32,7 +35,7 @@ class AgentModel(Base):
         new_agent = AgentModel(
             agent_id=agent_data.get("agent_id"),
             agent_name=agent_data.get("agent_name"),
-            agent_source=agent_data.get("agent_source"),
+            source_repo_id=agent_data.get("source_repo_id"),
             agent_description=agent_data.get("agent_description"),
             owner=agent_data.get("owner"),
             authorized_by=agent_data.get("authorized_by"),

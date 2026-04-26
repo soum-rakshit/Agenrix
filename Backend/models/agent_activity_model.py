@@ -2,8 +2,7 @@ from config.db_nosql import db
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-activity_collection = db["activity_logs"]
-comm_collection = db["external_communications"]
+telemetry_collection = db["telemetry_logs"]
 
 class NoSQLModel:
     @staticmethod
@@ -12,84 +11,79 @@ class NoSQLModel:
         return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
 
     @staticmethod
-    async def log_activity_bucket(agent_id: str, event_data: dict):
-        now = datetime.now(timezone.utc)
-        bucket_hour = now.replace(minute=0, second=0, microsecond=0)
-        if "timestamp" not in event_data:
-            event_data["timestamp"] = now
-
-        return await activity_collection.update_one(
-            {
-                "agent_id": agent_id,
-                "bucket_start": bucket_hour,
-                "event_count": {"$lt": 1000}
-            },
-            {
-                "$push": {"events": event_data},
-                "$inc": {"event_count": 1},
-                "$setOnInsert": {"bucket_end": bucket_hour.replace(minute=59, second=59)}
-            },
-            upsert=True
-        )
-
-    @staticmethod
-    async def add_external_comm(comm_data: dict):
+    async def add_telemetry_record(telemetry_data: dict):
+        # Calculate risk/compliance based on data_shared
         is_risky = any(
             item.get("is_confidential") and item.get("encryption_status") == "None" 
-            for item in comm_data.get("data_shared", [])
+            for item in telemetry_data.get("data_shared", [])
         )
-        comm_data["compliance_flag"] = "Red" if is_risky else "Green"
-        comm_data["timestamp"] = datetime.now(timezone.utc)
+        telemetry_data["compliance_flag"] = "Red" if is_risky else "Green"
         
-        return await comm_collection.insert_one(comm_data)
+        if "timestamp" not in telemetry_data:
+            telemetry_data["timestamp"] = datetime.now(timezone.utc)
+            
+        return await telemetry_collection.insert_one(telemetry_data)
 
     @staticmethod
     async def search_agent_records(
+        search: Optional[str] = None,
         agent_id: Optional[str] = None,
-        start_dt: Optional[datetime] = None,
-        end_dt: Optional[datetime] = None,
-        file_name: Optional[str] = None,
+        session_id: Optional[str] = None,
+        used_by: Optional[str] = None,
+        action: Optional[str] = None,
+        duration_min: Optional[int] = None,
+        files_altered: Optional[str] = None,
+        recipient: Optional[str] = None,
+        item: Optional[str] = None,
         classification: Optional[str] = None,
         is_confidential: Optional[bool] = None,
+        location_path: Optional[str] = None,
         encryption_status: Optional[str] = None
-    ) -> Dict[str, List[Any]]:
-        comm_query = {}
-        if agent_id: comm_query["agent_id"] = agent_id
-        if start_dt or end_dt:
-            comm_query["timestamp"] = {k: v for k, v in [("$gte", start_dt), ("$lte", end_dt)] if v}
-        data_filter = {}
-        if classification: data_filter["classification"] = classification
-        if is_confidential is not None: data_filter["is_confidential"] = is_confidential
-        if encryption_status: data_filter["encryption_status"] = encryption_status
-        if data_filter:
-            comm_query["data_shared"] = {"$elemMatch": data_filter}
-
-        comms = await comm_collection.find(comm_query).to_list(None)
-        act_pipeline = []
-        match_bucket = {}
-        if agent_id: match_bucket["agent_id"] = agent_id
-        if start_dt: match_bucket["bucket_end"] = {"$gte": start_dt}
-        if end_dt: match_bucket["bucket_start"] = {"$lte": end_dt}
-        if file_name: match_bucket["events.files_altered"] = file_name
+    ) -> List[Any]:
+        query = {}
         
-        act_pipeline.append({"$match": match_bucket})
-        act_pipeline.append({"$unwind": "$events"})
-        event_match = {}
-        if start_dt: event_match["events.timestamp"] = {"$gte": start_dt}
-        if end_dt: event_match["events.timestamp"] = {"$lte": end_dt}
-        if file_name: event_match["events.files_altered"] = file_name
-        act_pipeline.append({"$match": event_match})
-        act_pipeline.append({
-            "$project": {
-                "_id": 0,
-                "agent_id": 1,
-                "event": "$events"
-            }
-        })
-
-        activities = await activity_collection.aggregate(act_pipeline).to_list(None)
-
-        return {
-            "communications": [{**c, "_id": str(c["_id"])} for c in comms],
-            "activities": activities
-        }
+        if agent_id: query["agent_id"] = agent_id
+        if session_id: query["event.session_id"] = session_id
+        if used_by: query["event.used_by"] = {"$regex": used_by, "$options": "i"}
+        if action: query["event.action"] = {"$regex": action, "$options": "i"}
+        if duration_min is not None: query["event.duration_min"] = {"$gte": int(duration_min)}
+        if files_altered: query["event.files_altered"] = {"$regex": files_altered, "$options": "i"}
+        if recipient: query["recipient"] = {"$regex": recipient, "$options": "i"}
+        
+        # Build array match for data_shared
+        data_filter = {}
+        if item: data_filter["item"] = {"$regex": item, "$options": "i"}
+        if classification: data_filter["classification"] = {"$regex": classification, "$options": "i"}
+        if is_confidential is not None: data_filter["is_confidential"] = is_confidential
+        if location_path: data_filter["location_path"] = {"$regex": location_path, "$options": "i"}
+        if encryption_status: data_filter["encryption_status"] = {"$regex": encryption_status, "$options": "i"}
+        
+        if data_filter:
+            query["data_shared"] = {"$elemMatch": data_filter}
+        
+        if search:
+            # Fuzzy match across generic payload areas
+            search_regex = {"$regex": search, "$options": "i"}
+            or_conditions = [
+                {"event.action": search_regex},
+                {"event.used_by": search_regex},
+                {"recipient": search_regex}
+            ]
+            
+            if "data_shared" not in query:
+                query["data_shared"] = {"$elemMatch": {}}
+            query["data_shared"]["$elemMatch"]["$or"] = [
+                {"item": search_regex},
+                {"classification": search_regex},
+                {"location_path": search_regex}
+            ]
+            query["$or"] = or_conditions
+            
+        records = await telemetry_collection.find(query).to_list(None)
+        
+        # Clean ObjectIds
+        for r in records:
+            if "_id" in r:
+                r["_id"] = str(r["_id"])
+                
+        return records
