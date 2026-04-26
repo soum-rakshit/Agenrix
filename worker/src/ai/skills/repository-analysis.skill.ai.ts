@@ -1,10 +1,7 @@
 import { PromptTemplate } from "~/utils/prompt-template.util";
 
 export class RepositoryAnalysisSkill {
-  private readonly promptInternal =
-    new PromptTemplate(`# AI Agent Repository Static Analyzer Prompt
-
-## 1. Task context
+  private readonly promptInternal = new PromptTemplate(`## 1. Task context
 You are an automated **repository analysis agent**.
 
 Your task is to **walk through a GitHub repository and determine whether the repository contains code implementing an AI agent or agent-based system**.

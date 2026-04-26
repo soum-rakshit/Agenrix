@@ -18,8 +18,8 @@ const app = new Hono();
 app.use("*", cors());
 app.use("*", setupMiddleware);
 app.use(
-  "*",
-  pinoLogger({ pino: httpLogger, http: { referRequestIdKey: "requestId" } }),
+  "/v1/*",
+  pinoLogger({ pino: httpLogger, http: { referRequestIdKey: "requestId", } }),
 );
 
 app.route("/v1", router);
